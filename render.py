@@ -1,13 +1,10 @@
-"""Render the 33-story Image 1 edition with a thumbnail-legible type hierarchy."""
+"""Deterministically render the 19-story World in One Picture front page."""
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
-import random
 
 ROOT = Path(__file__).resolve().parent
-OUT = ROOT / "assets" / "entry.png"
-BASE = ROOT / "assets" / "entry-source.webp"
-REF2 = ROOT / "assets" / "reference-2.webp"
-REF3 = ROOT / "assets" / "reference-3.webp"
+ASSETS = ROOT / "assets"
+OUT = ASSETS / "entry.png"
 W = H = 1024
 S = 2
 
@@ -15,47 +12,32 @@ FONT_SERIF = "/usr/share/fonts/opentype/urw-base35/P052-Roman.otf"
 FONT_SERIF_B = "/usr/share/fonts/opentype/urw-base35/P052-Bold.otf"
 FONT_SERIF_I = "/usr/share/fonts/opentype/urw-base35/P052-Italic.otf"
 FONT_DISPLAY = "/usr/share/fonts/truetype/noto/NotoSerifDisplay-Bold.ttf"
-FONT_DISPLAY_I = "/usr/share/fonts/truetype/noto/NotoSerifDisplay-Italic.ttf"
 FONT_SANS = "/usr/share/fonts/opentype/urw-base35/NimbusSansNarrow-Regular.otf"
 FONT_SANS_B = "/usr/share/fonts/opentype/urw-base35/NimbusSansNarrow-Bold.otf"
-FONT_NARROW = FONT_SANS
-FONT_NARROW_B = FONT_SANS_B
 
-BG = "#F4F0E5"
-PAPER = "#FFFDF7"
-INK = "#171B20"
-NAVY = "#17354F"
-RED = "#A52C3D"
-BLUE = "#386D9E"
-GREEN = "#326B54"
-OCHRE = "#C18A40"
-MUTED = "#6B6A64"
-RULE = "#8C887F"
+BG, PAPER, INK = "#F4F0E5", "#FFFDF7", "#171B20"
+NAVY, RED, BLUE, GREEN = "#17354F", "#A52C3D", "#386D9E", "#326B54"
+OCHRE, MUTED, RULE = "#C18A40", "#6B6A64", "#A8A298"
 
 
 def render():
     canvas = Image.new("RGB", (W*S, H*S), BG)
     d = ImageDraw.Draw(canvas)
-    original = Image.open(BASE).convert("RGB")
-    ref2 = Image.open(REF2).convert("RGB")
-    ref3 = Image.open(REF3).convert("RGB")
     cache = {}
 
     def F(size, family="serif"):
         path = {"serif": FONT_SERIF, "serifb": FONT_SERIF_B, "serifi": FONT_SERIF_I,
-                "display": FONT_DISPLAY, "displayi": FONT_DISPLAY_I,
-                "sans": FONT_SANS, "sansb": FONT_SANS_B,
-                "narrow": FONT_NARROW, "narrowb": FONT_NARROW_B}[family]
-        key = (path, int(round(size*S)))
-        if key not in cache:
-            cache[key] = ImageFont.truetype(path, key[1])
+                "display": FONT_DISPLAY, "sans": FONT_SANS, "sansb": FONT_SANS_B}[family]
+        key = (path, round(size*S))
+        if key not in cache: cache[key] = ImageFont.truetype(path, key[1])
         return cache[key]
 
     def box(x1,y1,x2,y2,fill=None,outline=None,width=1):
-        d.rectangle((round(x1*S),round(y1*S),round(x2*S),round(y2*S)),fill=fill,outline=outline,width=max(1,round(width*S)))
+        d.rectangle(tuple(round(v*S) for v in (x1,y1,x2,y2)), fill=fill, outline=outline,
+                    width=max(1,round(width*S)))
 
     def line(x1,y1,x2,y2,fill=RULE,width=1):
-        d.line((round(x1*S),round(y1*S),round(x2*S),round(y2*S)),fill=fill,width=max(1,round(width*S)))
+        d.line(tuple(round(v*S) for v in (x1,y1,x2,y2)), fill=fill, width=max(1,round(width*S)))
 
     def text(x,y,s,size,fill=INK,family="serif",anchor=None):
         d.text((round(x*S),round(y*S)),s,font=F(size,family),fill=fill,anchor=anchor)
@@ -66,212 +48,169 @@ def render():
     def wrap(s,size,maxw,family="serif"):
         rows=[]; cur=""
         for word in s.split():
-            t=(cur+" "+word).strip()
-            if width(t,size,family)>maxw and cur:
-                rows.append(cur); cur=word
-            else: cur=t
+            nxt=(cur+" "+word).strip()
+            if cur and width(nxt,size,family)>maxw: rows.append(cur); cur=word
+            else: cur=nxt
         if cur: rows.append(cur)
         return rows
 
-    def para(x,y,s,maxw,size,fill=INK,family="serif",leading=None,maxlines=20,fit_min=None):
-        fs=size
-        rows=wrap(s,fs,maxw,family)
-        if fit_min is not None:
-            while len(rows)>maxlines and fs>fit_min:
+    def para(x,y,s,maxw,size,fill=INK,family="serif",leading=None,maxlines=20,minimum=None):
+        fs=size; rows=wrap(s,fs,maxw,family)
+        if minimum is not None:
+            while len(rows)>maxlines and fs>minimum:
                 fs-=.2; rows=wrap(s,fs,maxw,family)
-        rows=rows[:maxlines]
+        if len(rows)>maxlines:
+            raise ValueError(f"Text overflow: {s!r} ({len(rows)} lines; max {maxlines})")
         step=leading or fs*1.2
         for i,row in enumerate(rows): text(x,y+i*step,row,fs,fill,family)
-        return len(rows)*step, rows, fs
+        return len(rows)*step,rows,fs
 
-    def fitted(s,maxw,size,family="serifb",minimum=9):
+    def fit(s,maxw,size,family="serifb",minimum=9):
         while size>minimum and width(s,size,family)>maxw: size-=.2
         return size
 
-    def place_crop(source,crop,target,mode="cover"):
-        image=source.crop(crop)
-        x1,y1,x2,y2=target; tw=round((x2-x1)*S); th=round((y2-y1)*S)
-        if mode=="cover":
-            scale=max(tw/image.width,th/image.height)
-            image=image.resize((round(image.width*scale),round(image.height*scale)),Image.Resampling.LANCZOS)
-            left=(image.width-tw)//2; top=(image.height-th)//2
-            image=image.crop((left,top,left+tw,top+th))
+    def image_panel(source, crop, rect, border=True, mode="cover"):
+        x1,y1,x2,y2=rect; im=source.crop(crop)
+        tw,th=round((x2-x1)*S),round((y2-y1)*S)
+        if mode == "stretch":
+            im=im.resize((tw,th),Image.Resampling.LANCZOS)
         else:
-            image=image.resize((tw,th),Image.Resampling.LANCZOS)
-        canvas.paste(image,(round(x1*S),round(y1*S)))
+            scale=max(tw/im.width,th/im.height)
+            im=im.resize((round(im.width*scale),round(im.height*scale)),Image.Resampling.LANCZOS)
+            left=(im.width-tw)//2; top=(im.height-th)//2
+            im=im.crop((left,top,left+tw,top+th))
+        canvas.paste(im,(round(x1*S),round(y1*S)))
+        if border: box(x1,y1,x2,y2,None,"#77736B",.5)
 
-    # Quiet paper grain, matching Image 1's ivory identity.
-    random.seed(20261119)
-    for _ in range(8000):
-        x=random.randrange(W*S); y=random.randrange(H*S)
-        canvas.putpixel((x,y),(244,240,229) if random.random()<.65 else (248,245,237))
-    d=ImageDraw.Draw(canvas)
+    # All story artwork below is cropped from the three supplied WebP references.
+    ref=Image.open(ASSETS/"reference-1.webp").convert("RGB")
+    ref2=Image.open(ASSETS/"reference-2.webp").convert("RGB")
+    ref3=Image.open(ASSETS/"reference-3.webp").convert("RGB")
 
-    # Masthead and date, retaining Image 1's wording and structure.
-    text(16,6,"THE WORLD IN ONE DAY",15.2,RED,"sansb")
-    text(1008,6,"33 STORIES · EVERY CONTINENT · ALL FROM THIS ONE DAY",13.2,NAVY,"sansb","ra")
-    line(16,29,1008,29,INK,1.2)
+    # Masthead and date.
+    text(16,7,"THE WORLD IN ONE PICTURE",15.5,RED,"sansb")
+    text(1008,7,"19 STORIES · EVERY ONE FROM THURSDAY 19 NOVEMBER",13.4,NAVY,"sansb","ra")
+    line(16,29,1008,29,INK,1.35)
     title="Thursday 19 November 2026"
-    text(14,32,title,fitted(title,994,57,"display",49),NAVY,"display")
-    subtitle="Trump, Xi and Putin share one table · The World Court finds genocide in Myanmar · COP31’s draft drops fossil fuels"
-    para(17,96,subtitle,990,17.6,RED,"displayi",20,2,15)
-    line(16,122,1008,122,INK,.8)
+    text(14,32,title,fit(title,994,59,"display",52),INK,"display")
+    subtitle="Three leaders meet in Shenzhen · GTA VI unlocks worldwide · A record IPO starts trading · The World Court rules on the Rohingya"
+    para(17,103,subtitle,990,16.2,RED,"serifi",18.8,2,14.5)
+    line(16,127,1008,127,INK,.85)
 
-    # Geographical distribution.
-    regions=[("ASIA",7,"#B65C18"),("MIDDLE EAST",3,RED),("EUROPE",7,BLUE),("AFRICA",5,GREEN),
-             ("AMERICAS",4,"#6B4BA0"),("OCEANIA",4,"#1A7180"),("GLOBAL",3,"#58626C")]
-    total=sum(n for _,n,_ in regions); x=16; barw=992
-    for label,count,color in regions:
-        ww=barw*count/total
-        box(x,128,x+ww-1,153,color)
-        labeltext=f"{label} {count}"
-        fs=fitted(labeltext,ww-4,13.6,"sansb",10.5)
-        text(x+ww/2,140.5,labeltext,fs,"#FFFFFF","sansb","mm")
-        x+=ww
-
-    # Six key figures; larger numerals and captions.
-    stats=[("3","presidents at one table"),("9–6","World Court genocide vote"),
-           ("$120bn","aid goal cut at COP31"),("$81bn","Anthropic’s record IPO"),
-           ("109–0","Danish vote on Arctic pact"),("4.9%","Australian jobless rate")]
+    # Six edition statistics, set in six equal columns.
+    stats=[("$81.3bn","raised by Anthropic, the largest IPO on record"),
+           ("13 years","since GTA V; its sequel goes on sale today"),
+           ("551,864","sat South Korea’s college entrance exam"),
+           ("50,000","moved to safety in Odisha before Cyclone Akvan"),
+           ("$120bn","adaptation-finance goal still open at COP31"),
+           ("700,000+","Rohingya who fled Myanmar in 2017")]
     sx=16; sw=992/6
     for i,(num,desc) in enumerate(stats):
         x=sx+i*sw
-        if i: line(x,159,x,210,"#B4AEA2",.7)
-        text(x+8,155,num,fitted(num,sw-16,29,"display",22),RED,"display")
-        para(x+8,185,desc,sw-16,12.7,INK,"serifb",14.6,2,11.3)
-    line(16,215,1008,215,INK,.9)
+        if i: line(x,139,x,199,"#B8B1A5",.65)
+        text(x+8,135,num,fit(num,sw-15,23.5,"display",19),RED,"display")
+        para(x+8,164,desc,sw-16,12.2,INK,"serif",13.6,3)
+    line(16,204,1008,204,INK,.9)
 
-    # Feature cards: smaller art panes leave more room for readable copy.
-    leads=[
-      ("1","SHENZHEN · SUMMIT","Trump, Xi and Putin hold first three-way summit",
-       "The US, Chinese and Russian leaders met for 90 minutes and issued a “Declaration on Peace” on nuclear risk and UN reform. — Reuters · AP · Xinhua",(16,202,405,289),original),
-      ("2","THE HAGUE · JUSTICE","World Court: Myanmar committed genocide",
-       "By 9 votes to 6 the ICJ found Myanmar guilty of genocide against the Rohingya and ordered reparations. — Al Jazeera · UN News",(415,220,707,307),original),
-      ("3","ANTALYA · CLIMATE","COP31 draft drops fossil fuels and $120bn aid goal",
-       "The slimmer text has no figure for adaptation aid. Talks are due to end on Friday. — Reuters · AFP",(216,429,410,470),ref3)]
-    lx=16; ly=221; gap=8; lw=(992-2*gap)/3; lh=226
-    for i,(num,loc,head,desc,crop,source) in enumerate(leads):
-        x=lx+i*(lw+gap)
-        box(x,ly,x+lw,ly+lh,PAPER,"#494B4C",.8)
-        box(x,ly,x+lw,ly+17,RED)
-        text(x+7,ly+1,f"{num} · {loc}",11.4,"#FFFFFF","sansb")
-        place_crop(source,crop,(x+1,ly+18,x+lw-1,ly+92),"stretch")
-        hs=fitted(head,lw-18,21.2,"display",17)
-        para(x+9,ly+99,head,lw-18,hs,INK,"display",23,3,16.2)
-        para(x+9,ly+168,desc,lw-18,13.5,INK,"serif",14.4,4,12.2)
-
-    # Ten story cards. Their original topic-matched art remains; selected panels
-    # use matching scenes from the supplied reference graphics.
-    stories=[
-      ("4","CRIMEA · WAR","Ukraine hits Crimea bridge again","Third strike in a week halts trains to Russia. — Euronews",(535,439,654,487),ref2),
-      ("5","RIYADH · WAR","Saudis shoot down Houthi missiles","Debris fell on the capital; no casualties reported. — Reuters",(837,439,974,487),ref2),
-      ("6","ODISHA · STORM","Cyclone Akvan nears India’s coast","Over 100,000 in shelters before Friday’s landfall. — IMD",(426,429,604,482),ref3),
-      ("7","SEOUL · JUSTICE","Korea’s top court clears ex-PM Han","Han Duck-soo’s martial law conviction is overturned. — AP",(618,460,810,525),original),
-      ("8","GREENLAND · SECURITY","Denmark backs Arctic pact with US","Parliament approves the Greenland security deal 109–0. — AP",(817,460,1010,525),original),
-      ("9","NEW YORK · MARKETS","Anthropic starts trading on Nasdaq","Its record $81bn share sale was priced at $83. — AP",(14,611,207,678),original),
-      ("10","WORLDWIDE · GAMES","GTA VI goes on sale after 13 years","The midnight launch draws rave reviews. — ABC",(214,611,408,678),original),
-      ("11","BOGOTÁ · LABOUR","Colombia’s unions hold national strike","Marches in three cities against an economic law. — Infobae",(415,611,610,678),original),
-      ("12","NAIROBI · SPORT","Marathon champion banned for doping","Kenya’s Peres Jepchirchir gets three years. — ABC",(617,611,810,678),original),
-      ("13","CANBERRA · ECONOMY","Australia’s jobless rate hits 4.9%","Highest since 2021; shares and the dollar slide. — ABC",(818,611,1010,678),original),
+    # Three feature stories. High-resolution, story-matched artwork.
+    lead_data=[
+        ("1","SHENZHEN, CHINA · DIPLOMACY","Trump, Xi and Putin hold first three-way summit",
+         "The US, Chinese and Russian leaders meet together for the first time, on APEC’s last day. Putin backs the draft Shenzhen Declaration.", ref, (14,208,338,325)),
+        ("2","WORLDWIDE · GAMES","GTA VI finally goes on sale around the world",
+         "Rockstar’s sequel unlocks at midnight local time. New Zealand first, on PS5 and Xbox Series X|S; no PC version yet.", ref, (349,208,674,325)),
+        ("3","NEW YORK · MARKETS","Anthropic starts trading on Nasdaq as ANT",
+         "Priced at $83, above its $70–78 range; $81.3bn raised, the largest IPO on record, valuing the Claude maker near $1.5tn.", ref2, (14,611,207,678)),
     ]
-    # Scene-only replacement/crops that contain no unrelated story words.
-    art=[]
-    crimea=ref2.crop((535,439,654,487))
-    riyadh_box=(837,439,974,487)
-    riyadh=ref2.crop(riyadh_box)
-    riyadh_fill=ref2.getpixel((875,442))
-    ImageDraw.Draw(riyadh).ellipse((857-riyadh_box[0]-11,450-riyadh_box[1]-11,
-                                    857-riyadh_box[0]+11,450-riyadh_box[1]+11),fill=riyadh_fill)
-    akvan=ref3.crop((426,429,604,482))
-    art=[crimea,riyadh,akvan]
-    for i,(num,loc,head,desc,crop,source) in enumerate(stories):
-        col=i%5; row=i//5; x=16+col*200; y=456+row*140; cw=192; ch=136
-        box(x,y,x+cw,y+ch,PAPER,"#55534D",.7)
-        if i<3: pane=art[i]
-        elif source is original: pane=source.crop(crop)
-        else: pane=source.crop(crop)
-        # Story 10 gets the matching no-caption night-city/car detail from Image 2.
-        if num=="10":
-            pane=original.crop(crop)
-        place_crop(pane,(0,0,pane.width,pane.height),(x+1,y+1,x+cw-1,y+36))
-        # Add image 2's night car strip inside the GTA art window, without its labels.
-        if num=="10":
-            car=ref2.crop((420,254,710,298)).resize((round((cw-10)*S),round(20*S)),Image.Resampling.LANCZOS)
-            canvas.paste(car,(round((x+5)*S),round((y+13)*S)))
-        if num=="11":
-            crowd=ref2.crop((690,628,814,655)).resize((round((cw-10)*S),round(15*S)),Image.Resampling.LANCZOS)
-            canvas.paste(crowd,(round((x+5)*S),round((y+20)*S)))
-        tag=f"{num} · {loc}"
-        text(x+6,y+39,tag,fitted(tag,cw-12,11.2,"sansb",9.2),RED,"sansb")
-        hs=fitted(head,cw-12,16.3,"display",13.4)
-        _,rows,_=para(x+6,y+54,head,cw-12,hs,INK,"display",17.5,3,12.7)
-        decky=y+54+len(rows)*17.5+1
-        para(x+6,decky,desc,cw-12,12.5,INK,"serif",13.7,3,10.8)
+    margin=16; gap=10; cw=(992-2*gap)/3; y=212; ch=237; art_h=100
+    for i,(num,loc,head,deck,im,crop) in enumerate(lead_data):
+        x=margin+i*(cw+gap)
+        box(x,y,x+cw,y+ch,PAPER,"#55514A",.75)
+        image_panel(im,crop,(x+1,y+1,x+cw-1,y+art_h),mode="stretch")
+        box(x+1,y+art_h,x+cw-1,y+art_h+19,RED)
+        text(x+7,y+art_h+1,f"{num}  {loc}",11.3,"#FFFFFF","sansb")
+        hs=16.2
+        _,rows,_=para(x+9,y+art_h+25,head,cw-18,hs,INK,"serifb",18.1,3)
+        deck_y=y+art_h+28+len(rows)*18.1
+        para(x+9,deck_y,deck,cw-18,12.2,INK,"serif",13.3,4)
 
-    # Lower map and briefs. Four compact columns keep the 20 briefs visible,
-    # with larger line spacing than Image 1's original lower block.
-    lower_y=744
-    text(16,lower_y,"WHERE IT HAPPENED",15.2,NAVY,"sansb")
-    text(214,lower_y+1,"numbers match the stories",11.5,MUTED,"serifi")
-    text(355,lower_y,"ALSO ON THURSDAY 19 NOVEMBER 2026",15.2,NAVY,"sansb")
-    text(775,lower_y+1,"place · what happened · source",11.5,MUTED,"serifi")
-    line(16,765,1008,765,INK,.8)
-    mapcrop=original.crop((14,781,309,936)).resize((206*S,136*S),Image.Resampling.LANCZOS)
-    canvas.paste(mapcrop,(16*S,772*S))
-    box(16,772,222,908,None,"#77766F",.6)
+    # Eight secondary cards, four columns by two rows. Illustrations are selected
+    # only from the same story subject in the supplied references.
+    cards=[
+      ("4","THE HAGUE · LAW","World Court rules on Rohingya genocide","Judgment: The Gambia v Myanmar is read at 10:00; it is final, with no appeal.",ref,(14,463,254,520)),
+      ("5","ODISHA, INDIA · STORM","Cyclone Akvan nears India’s east coast","Red alert; 50,000 moved to safety in Odisha. Landfall is expected Friday between Narsapur and Puri.",ref,(265,463,505,520)),
+      ("6","ANTALYA, TÜRKİYE · CLIMATE","COP31 enters its last 48 hours","Talks split over money, with a $120bn adaptation goal still in play before Friday’s close.",ref,(516,463,756,520)),
+      ("7","SEOUL · EDUCATION","Half a million sit Korea’s Suneung","551,864 take the college exam; flights pause and a nationwide alert checks for hidden phones.",ref,(767,463,1009,520)),
+      ("8","WASHINGTON · IRAN WAR","Trump weighs a new Iran offensive, reports say","He also claims, unconfirmed, that Tehran is “looking at” biological weapons; Iran denies seeking them.",ref,(14,651,254,711)),
+      ("9","GAZA · WAR","Israeli armour pushes into central Gaza","Tanks and bulldozers move toward Salah al-Din Street; Hamas calls it a ceasefire breach.",ref,(265,651,505,711)),
+      ("10","BOGOTÁ · LABOUR","Colombia’s unions strike nationwide","Workers and teachers march against President De la Espriella’s “Economic Rescue” tax bill.",ref3,(416,548,606,587)),
+      ("11","CANBERRA · ECONOMY","Australia’s jobless rate rises","Economists warn of recession; the opposition calls it an “economic crisis”.",ref,(767,651,1009,711)),
+    ]
+    x0=16; y0=462; gapx=10; gapy=6; cardw=(992-3*gapx)/4; cardh=173; artH=45
+    for i,(num,loc,head,deck,im,crop) in enumerate(cards):
+        col=i%4; row=i//4; x=x0+col*(cardw+gapx); y=y0+row*(cardh+gapy)
+        box(x,y,x+cardw,y+cardh,PAPER,"#5B574F",.7)
+        image_panel(im,crop,(x+1,y+1,x+cardw-1,y+artH))
+        text(x+7,y+artH+5,f"{num}  {loc}",10.7,RED,"sansb")
+        hs=16.2
+        _,rows,_=para(x+7,y+artH+19,head,cardw-14,hs,INK,"serifb",17.2,3)
+        deck_y=y+artH+21+len(rows)*17.2
+        para(x+7,deck_y,deck,cardw-14,12.2,INK,"serif",13.1,4)
+
+    # Lower information zone: the locator map and two readable brief columns.
+    section_y=819
+    text(16,section_y,"WHERE IT HAPPENED",14.2,RED,"sansb")
+    text(332,section_y,"ALSO ON THURSDAY 19 NOVEMBER",14.2,RED,"sansb")
+    line(16,839,1008,839,INK,.8)
+    # Use the reference's original locator map, separated from its tiny caption text.
+    box(16,845,314,929,NAVY)
+    map_crop=ref.crop((14,856,314,961))
+    map_crop=map_crop.resize((200*S,70*S),Image.Resampling.LANCZOS)
+    canvas.paste(map_crop,(108*S,846*S))
+    text(23,864,"Red = stories 1–11",10.4,"#FFFDF7","sans")
+    text(23,879,"Grey = briefs",10.4,"#FFFDF7","sans")
 
     briefs=[
-      ("14","Shenzhen","Xi urges ban on all nuclear arms.","Al Jazeera"),
-      ("15","APEC","Albanese to Putin: “End your war, end it now.”","ABC"),
-      ("16","Seoul","Half a million sit college entrance exam.","Sedaily"),
-      ("17","Jakarta","Asset-seizure law passes after 18 years.","Kompas"),
-      ("18","Hormuz","Iran says mines set 5 tankers ablaze.","Al Jazeera"),
-      ("19","Gaza","Israel ends tank raid past truce line.","BBC"),
-      ("20","Krasnodar","Kyiv says it hit two oil refineries.","Euronews"),
-      ("21","Brussels","EU delays methane rules two years.","Euronews"),
-      ("22","UK","Inquiry: yacht Bayesian was vulnerable to wind.","RNZ"),
-      ("23","Zurich","Two rivals to challenge FIFA’s Infantino.","ABC"),
-      ("24","Rome","Author Corrado Augias dies at 91.","Euronews"),
-      ("25","Mogadishu","Somalia expels UAE ambassador.","Al Jazeera"),
-      ("26","Sudan","Court sentences absent RSF chief to death.","AP"),
-      ("27","Pretoria","Central bank holds rate at 7.25%.","SABC"),
-      ("28","Canaries","Record 11,000 migrants in 15 days.","Africanews"),
-      ("29","Florida","Floods shut Broward, Miami schools again.","CBS"),
-      ("30","Wellington","Court: pay equity cuts broke rights law.","RNZ"),
-      ("31","Tonga","Drought emergency takes effect.","RNZ"),
-      ("32","Cook Islands","Cyclone Xavier weakens to category 4.","RNZ"),
-      ("33","Space","Red giant seen eating a Sun-sized star.","Nature"),
+      ("FLORIDA","Broward schools stay shut after 15 inches of rain."),
+      ("MEXICO CITY","Banxico minutes explain its surprise cut."),
+      ("LONDON","National Grid debunks a viral AI-made “blackout” post."),
+      ("NEW DELHI","Schools reopen as GRAP-III smog curbs are lifted."),
+      ("SHENZHEN","Putin backs APEC’s draft Shenzhen Declaration."),
+      ("AUCKLAND","New Zealanders are first to play GTA VI, at midnight."),
+      ("LONDON","A Taoist temple opens in Chinatown."),
+      ("SYDNEY","Data centres may add 39m t of CO₂ a year by 2035."),
     ]
-    bx=234; bw=774; colgap=12; colw=(bw-colgap)/2; top=772; rows_per=10; rowh=16.5
-    badge_colors=[OCHRE,RED]
-    for i,(num,place,summary,source) in enumerate(briefs):
-        col=i//rows_per; row=i%rows_per; x=bx+col*(colw+colgap); y=top+row*rowh
-        color=badge_colors[col]
-        d.ellipse((round(x*S),round((y+1)*S),round((x+15)*S),round((y+16)*S)),fill=color)
-        text(x+7.5,y+8.5,num,9.2,"#FFFFFF","sansb","mm")
-        fs=16.0
-        rest=f"{summary} {source}"
-        while width(place+" ",fs,"narrowb")+width(rest,fs,"narrow")>colw-23 and fs>14.0:
-            fs-=.2
-        assert width(place+" ",fs,"narrowb")+width(rest,fs,"narrow")<=colw-22, f"brief {num} exceeds its column"
-        tx=x+19
-        text(tx,y,place,fs,RED,"narrowb")
-        text(tx+width(place+" ",fs,"narrowb"),y,rest,fs,INK,"narrow")
-        line(x+19,y+15.6,x+colw,y+15.6,"#D1CBBF",.35)
+    bx=332; colgap=16; colw=(676-colgap)/2; top=842; brief_fs=12.2
+    brief_columns=[briefs[:4],briefs[4:]]
+    for col,items in enumerate(brief_columns):
+        x=bx+col*(colw+colgap); yy=top
+        for place,summary in items:
+            prefix=place+" — "
+            first_width=colw-width(prefix,brief_fs,"serifb")
+            lines=[]; current=""; available=first_width
+            for word in summary.split():
+                candidate=(current+" "+word).strip()
+                if current and width(candidate,brief_fs,"serif")>available:
+                    lines.append(current); current=word; available=colw
+                else:
+                    current=candidate
+            if current: lines.append(current)
+            text(x,yy,place,brief_fs,RED,"serifb")
+            text(x+width(prefix,brief_fs,"serifb"),yy,lines[0],brief_fs,INK,"serif")
+            for line_no,content in enumerate(lines[1:],1):
+                text(x+4,yy+line_no*13.2,content,brief_fs,INK,"serif")
+            yy+=max(14.5,len(lines)*13.2)+1.2
 
-    # Date check and footer retain every phrase from Image 1.
-    box(16,940,1008,1002,PAPER,RED,.9)
-    text(24,943,"DATE CHECK ✓",13.5,GREEN,"sansb")
-    datecheck="Every story on this page happened, or was first reported, on Thursday 19 November 2026. LEFT OUT AS OTHER DAYS’ NEWS: 18 NOV: EU’s €45bn Ukraine loan plan · Iran fires on Kuwait and Bahrain · Nvidia results · Jeffries named for US speaker · Carney on China ties 20 NOV: COP31’s scheduled close · Cyclone Akvan’s landfall"
-    para(132,942,datecheck,866,12.8,INK,"serif",14.4,4,10.8)
-    footer="Claims are attributed, not stated as fact · Pictures and map: original, drawn in code · Sources: Reuters, AP, AFP, BBC, Al Jazeera, UN News, Euronews, ABC, RNZ, Xinhua, Nature · 2026-11-19"
-    footer_size=fitted(footer,990,12.2,"narrow",10.8)
-    text(18,1006,footer,footer_size,INK,"narrow")
+    # Editorial fact check and sourcing footer.
+    box(16,940,1008,993,"#FBF6F1",RED,.9)
+    datecheck="DATE CHECK — left off on purpose because they broke before Thursday: Voyager 1 reaches one light-day from Earth (18 Nov) · Van Gogh’s record $190.4m sale in New York (18 Nov) · EU proposes a €45bn Ukraine loan (18 Nov) · Saudi all-clear after Houthi alerts (18 Nov) · William and Kate meet Modi (18 Nov) · US strikes on Iran’s Qeshm Island (17 Nov)"
+    para(24,943,datecheck,974,12.2,INK,"serif",13.8,3)
+    footer="Every story above happened, or was first reported, on Thursday 19 November 2026, in any time zone; claims are attributed, not stated as fact. Sources: AP, Reuters, CNBC, ICJ, IMD, UNFCCC, ABC (Australia), Korea JoongAng Daily, Al Jazeera. Original drawings."
+    fs=fit(footer,990,10.5,"sans",9.2)
+    text(17,999,footer,fs,INK,"sans")
 
     final=canvas.resize((W,H),Image.Resampling.LANCZOS)
     final.quantize(colors=256,method=Image.Quantize.MEDIANCUT,dither=Image.Dither.NONE).save(
-        OUT,format="PNG",optimize=True,compress_level=9
-    )
+        OUT,format="PNG",optimize=True,compress_level=9)
     return OUT
 
 
