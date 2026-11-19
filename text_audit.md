@@ -1,35 +1,32 @@
-# Text and graphics audit — Image 1 recreation
+# Text and legibility audit — THE WORLD IN ONE DAY
 
-## Text preservation
+## Text and story coverage
 
-Image 1 is the base layer. Its masthead, edition line, date, subtitle, seven region labels and counts, six statistics, all 33 story items, map, date-check sentence, footer, and every article headline, description, and source reference remain in their original positions. No text was retyped, rewritten, or added to the art panels. The complete visible copy is transcribed in `reference_transcription.md`.
+The revised image keeps Image 1's complete copy and 33-story numbering: 3 lead stories, 10 illustrated cards (stories 4–13), and 20 briefs (stories 14–33). It retains the seven regional counts, six statistics, map, date-check wording, footer, and all visible story sources. No stories were added or removed. The complete copy is recorded in `reference_transcription.md`.
 
-The source clips part of the first lead card's final source line at the lower card edge. The image was preserved as supplied; the transcription notes this clipping rather than silently correcting it.
+The first lead card's last source line is clipped in Image 1. The transcription records the visible source text and notes the source clipping.
 
-## Graphics adapted from Images 2 and 3
+## Design changes for the review feedback
 
-- Story 4, Crimea bridge: bridge strike scene from Image 2.
-- Story 5, Riyadh missile: night skyline and interception scene from Image 2.
-- Story 6, Cyclone Akvan: cyclone symbol from Image 3.
-- Story 9, Anthropic: chart detail from Image 3, without its labels.
-- Story 10, GTA VI: city and car strip from Image 2, without its labels.
-- Story 11, Bogotá: march crowd from Image 2, retaining Image 1's own banner.
+The recurring critique was that dense copy becomes hard to read at thumbnail scale. The masthead, date, statistics, story headlines, and descriptions now have a clearer size and weight hierarchy. Lead and secondary artwork panes are shorter to give their copy more room. The 20 briefs use two wider columns with one-line entries and highlighted locations, instead of narrow wrapped columns.
 
-Image 1 has no France story, so Image 3's French political graphic was not placed on an unrelated item. Other cards retain Image 1's original topic-matched art.
+Artwork remains matched to its story: summit, World Court, climate, bridge strike, Riyadh interception, cyclone, justice, Arctic pact, IPO, GTA VI, Bogotá strike, doping, and Australian jobs. The supplied French political art was not used because Image 1 has no France story.
 
 ## Output checks
 
 - PNG: valid, 1024 × 1024 pixels
-- Size: 426,030 bytes (under 1 MiB)
-- SHA-256: `467c2c993a30d09195f327144c13c9103b795d74bdcfadef4b9b6e5ddfea96ff`
-- Renderer: deterministic Pillow compositing; source text remains from Image 1
-- Main runtime: existing `main.ts`; Node built-ins only, copies the bundled `assets/entry.png`
+- File size: 252,398 bytes (under 1 MiB)
+- SHA-256: `da6400a9c2e903dc9b6339219331baaef7becc64fef0c784c8a3ce14afea0f24`
+- Deterministic repeat render: byte-identical
+- `out/entry.png`: byte-identical runtime copy
+- Text: compared against the supplied Image 1 transcription; all 33 items and publication text are present
+- Runtime: existing `main.ts` copies `assets/entry.png`; uses Node built-ins only
 - No commit, push, or submission performed
 
-## Changed files
+## Files changed
 
-- `render.py` — reproducible composition of relevant supplied art into Image 1's artwork panels
-- `assets/entry.png` — final image
-- `assets/reference-2.webp` and `assets/reference-3.webp` — bundled art references used by the renderer
-- `reference_transcription.md` — Image 1 copy transcription
+- `render.py` — 1024-square renderer with larger type hierarchy and content-matched artwork
+- `assets/entry.png` — revised deliverable
+- `assets/reference-2.webp`, `assets/reference-3.webp` — supplied visual references used for matching artwork
+- `reference_transcription.md` — complete Image 1 copy transcription
 - `text_audit.md` — this report
