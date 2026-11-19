@@ -16,8 +16,10 @@ FONT_SERIF_B = "/usr/share/fonts/opentype/urw-base35/P052-Bold.otf"
 FONT_SERIF_I = "/usr/share/fonts/opentype/urw-base35/P052-Italic.otf"
 FONT_DISPLAY = "/usr/share/fonts/truetype/noto/NotoSerifDisplay-Bold.ttf"
 FONT_DISPLAY_I = "/usr/share/fonts/truetype/noto/NotoSerifDisplay-Italic.ttf"
-FONT_SANS = "/usr/share/fonts/opentype/urw-base35/NimbusSans-Regular.otf"
-FONT_SANS_B = "/usr/share/fonts/opentype/urw-base35/NimbusSans-Bold.otf"
+FONT_SANS = "/usr/share/fonts/opentype/urw-base35/NimbusSansNarrow-Regular.otf"
+FONT_SANS_B = "/usr/share/fonts/opentype/urw-base35/NimbusSansNarrow-Bold.otf"
+FONT_NARROW = FONT_SANS
+FONT_NARROW_B = FONT_SANS_B
 
 BG = "#F4F0E5"
 PAPER = "#FFFDF7"
@@ -42,7 +44,8 @@ def render():
     def F(size, family="serif"):
         path = {"serif": FONT_SERIF, "serifb": FONT_SERIF_B, "serifi": FONT_SERIF_I,
                 "display": FONT_DISPLAY, "displayi": FONT_DISPLAY_I,
-                "sans": FONT_SANS, "sansb": FONT_SANS_B}[family]
+                "sans": FONT_SANS, "sansb": FONT_SANS_B,
+                "narrow": FONT_NARROW, "narrowb": FONT_NARROW_B}[family]
         key = (path, int(round(size*S)))
         if key not in cache:
             cache[key] = ImageFont.truetype(path, key[1])
@@ -179,9 +182,6 @@ def render():
     riyadh_fill=ref2.getpixel((875,442))
     ImageDraw.Draw(riyadh).ellipse((857-riyadh_box[0]-11,450-riyadh_box[1]-11,
                                     857-riyadh_box[0]+11,450-riyadh_box[1]+11),fill=riyadh_fill)
-    # Remove the source panel's 9 marker; keep the matching Riyadh skyline art.
-    fill=ref2.getpixel((875,442))
-    ImageDraw.Draw(riyadh).ellipse((857-837-11,450-439-11,857-837+11,450-439+11),fill=fill)
     akvan=ref3.crop((426,429,604,482))
     art=[crimea,riyadh,akvan]
     for i,(num,loc,head,desc,crop,source) in enumerate(stories):
@@ -242,30 +242,31 @@ def render():
       ("32","Cook Islands","Cyclone Xavier weakens to category 4.","RNZ"),
       ("33","Space","Red giant seen eating a Sun-sized star.","Nature"),
     ]
-    bx=234; bw=774; colgap=12; colw=(bw-colgap)/2; top=772; rows_per=10; rowh=15.2
+    bx=234; bw=774; colgap=12; colw=(bw-colgap)/2; top=772; rows_per=10; rowh=16.5
     badge_colors=[OCHRE,RED]
     for i,(num,place,summary,source) in enumerate(briefs):
         col=i//rows_per; row=i%rows_per; x=bx+col*(colw+colgap); y=top+row*rowh
         color=badge_colors[col]
-        d.ellipse((round(x*S),round((y+1)*S),round((x+14)*S),round((y+15)*S)),fill=color)
-        text(x+7,y+8,num,8.6,"#FFFFFF","sansb","mm")
-        fs=14.0
+        d.ellipse((round(x*S),round((y+1)*S),round((x+15)*S),round((y+16)*S)),fill=color)
+        text(x+7.5,y+8.5,num,9.2,"#FFFFFF","sansb","mm")
+        fs=16.0
         rest=f"{summary} {source}"
-        while width(place+" ",fs,"serifb")+width(rest,fs,"serif")>colw-23 and fs>11.4:
+        while width(place+" ",fs,"narrowb")+width(rest,fs,"narrow")>colw-23 and fs>14.0:
             fs-=.2
-        assert width(place+" ",fs,"serifb")+width(rest,fs,"serif")<=colw-22, f"brief {num} exceeds its column"
+        assert width(place+" ",fs,"narrowb")+width(rest,fs,"narrow")<=colw-22, f"brief {num} exceeds its column"
         tx=x+19
-        text(tx,y,place,fs,RED,"serifb")
-        text(tx+width(place+" ",fs,"serifb"),y,rest,fs,INK,"serif")
-        line(x+19,y+14.3,x+colw,y+14.3,"#D1CBBF",.35)
+        text(tx,y,place,fs,RED,"narrowb")
+        text(tx+width(place+" ",fs,"narrowb"),y,rest,fs,INK,"narrow")
+        line(x+19,y+15.6,x+colw,y+15.6,"#D1CBBF",.35)
 
     # Date check and footer retain every phrase from Image 1.
-    box(16,931,1008,1002,PAPER,RED,.9)
-    text(24,935,"DATE CHECK ✓",13.5,GREEN,"sansb")
+    box(16,940,1008,1002,PAPER,RED,.9)
+    text(24,943,"DATE CHECK ✓",13.5,GREEN,"sansb")
     datecheck="Every story on this page happened, or was first reported, on Thursday 19 November 2026. LEFT OUT AS OTHER DAYS’ NEWS: 18 NOV: EU’s €45bn Ukraine loan plan · Iran fires on Kuwait and Bahrain · Nvidia results · Jeffries named for US speaker · Carney on China ties 20 NOV: COP31’s scheduled close · Cyclone Akvan’s landfall"
-    para(132,934,datecheck,866,12.8,INK,"serif",14.4,4,10.8)
+    para(132,942,datecheck,866,12.8,INK,"serif",14.4,4,10.8)
     footer="Claims are attributed, not stated as fact · Pictures and map: original, drawn in code · Sources: Reuters, AP, AFP, BBC, Al Jazeera, UN News, Euronews, ABC, RNZ, Xinhua, Nature · 2026-11-19"
-    para(18,1006,footer,990,10.8,INK,"serif",12.0,2,9.8)
+    footer_size=fitted(footer,990,12.2,"narrow",10.8)
+    text(18,1006,footer,footer_size,INK,"narrow")
 
     final=canvas.resize((W,H),Image.Resampling.LANCZOS)
     final.quantize(colors=256,method=Image.Quantize.MEDIANCUT,dither=Image.Dither.NONE).save(

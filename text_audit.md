@@ -8,15 +8,15 @@ The first lead card's last source line is clipped in Image 1. The transcription 
 
 ## Design changes for the review feedback
 
-The recurring critique was that dense copy becomes hard to read at thumbnail scale. The masthead, date, statistics, story headlines, and descriptions now have a clearer size and weight hierarchy. Lead and secondary artwork panes are shorter to give their copy more room. The 20 briefs use two wider columns with one-line entries and highlighted locations, instead of narrow wrapped columns.
+The recurring critique was that dense copy becomes hard to read at thumbnail scale. The masthead, date, statistics, story headlines, and descriptions now have a clearer size and weight hierarchy. Lead and secondary artwork panes are shorter to give their copy more room. The 20 briefs use two wider columns with one-line entries, condensed type, and highlighted locations, instead of narrow wrapped columns. The image was inspected at full size and at a 300-pixel thumbnail.
 
 Artwork remains matched to its story: summit, World Court, climate, bridge strike, Riyadh interception, cyclone, justice, Arctic pact, IPO, GTA VI, Bogotá strike, doping, and Australian jobs. The supplied French political art was not used because Image 1 has no France story.
 
 ## Output checks
 
 - PNG: valid, 1024 × 1024 pixels
-- File size: 252,398 bytes (under 1 MiB)
-- SHA-256: `da6400a9c2e903dc9b6339219331baaef7becc64fef0c784c8a3ce14afea0f24`
+- File size: 257,731 bytes (under 1 MiB)
+- SHA-256: `617419b8098193a7524cdfcd8acaca112c653c344f4eb4d899c8601274f46da6`
 - Deterministic repeat render: byte-identical
 - `out/entry.png`: byte-identical runtime copy
 - Text: compared against the supplied Image 1 transcription; all 33 items and publication text are present
