@@ -4,7 +4,7 @@
 [![rank](https://make.fun/badge/news-image-20261119/vacegig/world-news-image-2026-11-19/rank.svg)](https://make.fun/bounty/news-image-20261119/leaderboard?utm_source=github&utm_medium=readme&utm_campaign=news-image-20261119)
 [![reward](https://make.fun/badge/news-image-20261119/vacegig/world-news-image-2026-11-19/reward.svg)](https://make.fun/bounty/news-image-20261119?utm_source=github&utm_medium=readme&utm_campaign=news-image-20261119)
 
-An original editorial infographic summarizing five verified international developments from Thursday, 19 November 2026. The artwork is drawn from scratch; factual notes and source links are in [sources.md](sources.md).
+An original editorial data atlas summarizing 15 developments first reported or taking place on Thursday, 19 November 2026. It pairs a custom vector globe with six illustrated lead stories, nine regional briefs and four sourced data points. Date checks, attributions and source links are in [sources.md](sources.md).
 
 ## Run it
 
